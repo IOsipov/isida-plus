@@ -7,10 +7,13 @@
     <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
     <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
     <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+    <script src="javascripts/raphael-min.js"></script>
+    <script src="javascripts/underscore-min.js"></script>
+    <script src="javascripts/sequence-diagram-min.js"></script>
     <!--[if lt IE 9]>
     <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
     <![endif]-->
-    <title>iSida-plus</title>
+    <title>iSida-plus::Dev-docs</title>
   </head>
 
   <body>
@@ -19,17 +22,17 @@
 
         <header>
           <h1>iSida-plus</h1>
-          <h2>Jabber bot</h2>
+          <h2>Development documentation</h2>
         </header>
 
-        <ul class="menu">
-                <li><a href="index.html"><div id="hl">Home</div></a></li>
-                <li><a href="guide.html">Guide</a></li>
-                <li><a href="dev-docs.html">Dev-docs</a></li>
-                <li><a href="https://github.com/tylkas/isida-plus/zipball/master">Download</a></li>
-                <li><a href="https://github.com/tylkas/isida-plus/issues">Issues</a></li>
-                <li><a href="https://github.com/tylkas/isida-plus">View on GitHub</a></li>
-        </ul>
+	<ul class="menu">
+     		<li><a href="index.html">Home</a></li>
+	        <li><a href="guide.html">Guide</a></li>
+	        <li><a href="dev-docs.html"><div id="hl">Dev-docs</div></a></li>
+	        <li><a href="https://github.com/tylkas/isida-plus/zipball/master">Download</a></li>
+	        <li><a href="https://github.com/tylkas/isida-plus/issues">Issues</a></li>
+	        <li><a href="https://github.com/tylkas/isida-plus">View on GitHub</a></li>
+	</ul>
 
         <hr>
 
@@ -37,15 +40,18 @@
 
 <div style="text-align: center;"><h2>WARNING: The bot is under development!</h2></div>
 
-<h3>About</h3>
+<h3>Main information</h3>
 
-<p>iSida-plus is a fork of <a href="https://github.com/disabler/isida3">Disabler's project</a> from 20 Apr 2014.</p>
+<p>iSida-plus is a module based jabber bot. All plugins are inherited from the template class in plugins directory.</p>
+<div id="bot-kernel"></div><script src="diagrams/bot-kernel.js"></script>
+<div style="text-align: center; font-style: italic;">Pic 1. Connections between kernel and plugins</div>
+<br/>
+<p>File <strong>plugins/template.py</strong> provides class PluginTemplate and methods of messaging between plugins and the kernel.</p>
 
-<p>This bot for the most part focused on the using in enterprises. With the ability to integrate with existing infrastructure and trying to make administrator's life easier.</p>
 
-<p>We have an <a href="https://github.com/tylkas/isida-plus/issues">issue tracker</a> to send your requests about bot features and such. Also, feel free to comment and send bug reports.</p>
-
-<p><br/>With best regards =]</p>
+<h3>
+In progress...
+</h3>
 
         </section>
 
