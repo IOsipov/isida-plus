@@ -1,22 +1,28 @@
 [XMPP]
-NICKNAME    = 'iSida-plus'
-JID         = 'bot_jid@example.com'
-PASSWORD    = 'PA55W0RD'
-STATUS      = 'online'
-STATUS_MSG  = 'Hello world'
+NICKNAME    = iSida-plus
+JID         = bot_jid@example.com
+PASSWORD    = PA55W0RD
+STATUS      = online
+STATUS_MSG  = Hello world
 PRIORITY    = 0
 
 [INIT_CONFIGS]
-OWNER       = 'your_jid@example.com'
-CHATROOM    = 'conference@example.com'
+OWNER       = your_jid@example.com
+CHATROOM    = conference@example.com
+ACTION_CHAR = .
 
 [DB]
-TYPE    = 'mysql'
-SERVER  = 'localhost'
-PORT    = 3306
-DBNAME  = 'isidaplus'
-DBUSER  = 'isidaplus'
-DBPASS  = 'isidaplus'
+TYPE        = mysql
+HOST        = 127.0.0.1
+PORT        = 3306
+DBNAME      = isidaplus
+DBUSER      = isidaplus
+DBPASS      = isidaplus
+ERRDELAY    = 10
+ERRRETRY    = 3
 
-[OTHER]
-LOG_DIR     = 'logs'
+[LOGS]
+DEBUG_LVL   = 4
+LOG_DIR     = logs
+PREFIX_MAIN = kernel
+PREFIX_DB   = db
