@@ -103,7 +103,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     # On receiving private message
     def message(self, msg):
         if msg['type'] in ['normal', 'chat']:
-            msg.reply("You are sending:\n%s" % msg['body']).send()
+            msg.reply("You are sending: %s" % msg['body']).send()
 
     # =========================
     # On receiving chat message
@@ -123,6 +123,10 @@ isidabot.register_plugin('xep_0004')    # Data Forms
 isidabot.register_plugin('xep_0060')    # PubSub
 isidabot.register_plugin('xep_0199')    # XMPP Ping
 isidabot.register_plugin('xep_0045')    # MUC
+isidabot.register_plugin('xep_0012')    # Last activity
+isidabot.register_plugin('xep_0092')    # Software Version
+isidabot.register_plugin('xep_0202')    # Entity Time
+
 
 if isidabot.connect():
     isidabot.process(threaded=False)
