@@ -22,7 +22,7 @@ ERRDELAY    = 10
 ERRRETRY    = 3
 
 [LOGS]
-DEBUG_LVL   = 4
+DEBUG_LVL   = 20
 LOG_DIR     = logs
 PREFIX_MAIN = kernel
 PREFIX_DB   = db

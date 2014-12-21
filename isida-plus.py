@@ -1,21 +1,23 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# =============================
-# Set UTF-8 as default encoding
+import logging as log
+import ConfigParser
+import sleekxmpp
+
+# Set UTF-8 as default encoding.
 import sys
 if sys.version_info < (3, 0):
     reload(sys)
     sys.setdefaultencoding('utf8')
-# =============================
-
-import logging
-import ConfigParser
-import sleekxmpp
 
 
+# noinspection PyMethodMayBeStatic
 class IsidaPlus(sleekxmpp.ClientXMPP):
-    # Default values
+    """
+    Make default values.
+    Later they will be filled from config file.
+    """
     __config = {u'CONFIGFILE': 'isida-plus.cfg',
                 u'LOGS': {
                     u'DEBUG_LVL': 1,
@@ -37,8 +39,9 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                 }}
     __config_parser = ConfigParser.RawConfigParser()
 
-    # ==================
-    # Bot initialization
+    """
+    Bot initialization
+    """
     def __init__(self):
         # Open config file
         self.__config_parser.read(self.__config[u'CONFIGFILE'])
@@ -48,10 +51,11 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
         self.__config[u'LOGS'][u'LOG_DIR'] = self.__config_get(u'LOGS', u'LOG_DIR')
         self.__config[u'LOGS'][u'PREFIX_MAIN'] = self.__config_get(u'LOGS', u'PREFIX_MAIN')
 
-        logging.basicConfig(format=u'[%(asctime)s %(levelname)s] %(message)s',
-                            level=logging.DEBUG,
-                            filename=u'%s/%s.log' %
-                                     (self.__config[u'LOGS'][u'LOG_DIR'], self.__config[u'LOGS'][u'PREFIX_MAIN']))
+        # Logging level for sleekxmpp lib
+        log.basicConfig(format=u'[%(asctime)s %(levelname)s] %(message)s',
+                        level=self.__config[u'LOGS'][u'DEBUG_LVL'],
+                        filename=u'%s/%s.log' %
+                                 (self.__config[u'LOGS'][u'LOG_DIR'], self.__config[u'LOGS'][u'PREFIX_MAIN']))
 
         # Define all parameters
         self.__define_params()
@@ -64,8 +68,9 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
         self.add_event_handler('message', self.message)
         self.add_event_handler("groupchat_message", self.muc_message)
 
-    # ==========================
-    # Get value from config file
+    """
+    Get value from config file
+    """
     def __config_get(self, section, option, use_default=True):
         try:
             if self.__config_parser.get(section, option).isdigit():
@@ -76,22 +81,24 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
             if use_default:
                 return self.__config[section][option]
             else:
-                print u'ConfigParser exception at __config_get__(%s, %s): %s' % (section, option, e)
+                log.error(u'ConfigParser exception at __config_get__(%s, %s): %s' % (section, option, e))
         except IOError, e:
-            print u'IOError exception at __config_get__(%s, %s): %s' % (section, option, e)
+            log.error(u'IOError exception at __config_get__(%s, %s): %s' % (section, option, e))
             self.__del__()
             exit(-1)
 
-    # ========================
-    # Define kernel parameters
+    """
+    Define kernel parameters
+    """
     def __define_params(self):
         for param in self.__config[u'XMPP']:
             self.__config[u'XMPP'][param] = self.__config_get(u'XMPP', param, False)
         for param in self.__config[u'INIT_CONFIGS']:
             self.__config[u'INIT_CONFIGS'][param] = self.__config_get(u'INIT_CONFIGS', param, False)
 
-    # =================
-    # Starting function
+    """
+    Starting function
+    """
     def start(self, event):
         self.send_presence()
         self.get_roster()
@@ -99,24 +106,34 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                                         self.__config[u'XMPP'][u'NICKNAME'],
                                         wait=True)
 
-    # ============================
-    # On receiving private message
+    """
+    On receiving any message
+    """
     def message(self, msg):
         if msg['type'] in ['normal', 'chat']:
-            msg.reply("You are sending: %s" % msg['body']).send()
+            log.info(u'<-- from %s: %s' % (msg['from'], msg['body']))
+            reply_msg = u'You are sending: %s' % msg['body']
+            log.info(u'--> to %s: %s' % (msg['from'], reply_msg))
+            msg.reply(reply_msg).send()
 
-    # =========================
-    # On receiving chat message
+    """
+    On receiving muc message
+    """
     def muc_message(self, msg):
+        log.info(u'<== from %s: %s' % (msg['from'], msg['body']))
         if msg['mucnick'] != self.__config[u'XMPP'][u'NICKNAME']:
             if msg['body'][0] == self.__config[u'INIT_CONFIGS'][u'ACTION_CHAR']:
+                reply_msg = u'%s, I heard that.' % msg['mucnick']
+                log.info(u'==> to %s: %s' % (msg['from'], reply_msg))
                 self.send_message(mto=msg['from'].bare,
-                                  mbody="%s, I heard that." % msg['mucnick'],
+                                  mbody=reply_msg,
                                   mtype='groupchat')
 
 
-# ================
-# === THE MAIN ===
+"""
+    ================
+    === THE MAIN ===
+"""
 isidabot = IsidaPlus()
 isidabot.register_plugin('xep_0030')    # Service Discovery
 isidabot.register_plugin('xep_0004')    # Data Forms
@@ -130,6 +147,6 @@ isidabot.register_plugin('xep_0202')    # Entity Time
 
 if isidabot.connect():
     isidabot.process(threaded=False)
-    print("Done")
+    print(u'Done')
 else:
-    print("Unable to connect.")
+    print(u'Unable to connect.')
