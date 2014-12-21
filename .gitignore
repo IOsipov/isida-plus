@@ -4,3 +4,9 @@ __pycache__/
 
 # PyCharm configs
 .idea
+
+# Config file
+isida-plus.cfg
+
+# Logs
+logs/*.log
