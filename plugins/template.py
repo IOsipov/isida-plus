@@ -31,14 +31,13 @@ def db_execute(query=None):
 # ===============
 # Plugin template
 class Main():
-    __someiter = 0
-
     Name = 'Template'
     Description = 'Template plugin. Used as example.'
     Ver = '0.1'
     URL = 'Native'
     SupCommands = [
         ['test', 'Check bot activity'],
+        ['test start', 'Start checking'],
         ['test stop', 'Stop checking']
     ]
 
@@ -51,26 +50,44 @@ class Main():
 
     def run(self, msg):
         if msg['body'] == self.SupCommands[0][0]:
-            self.__someiter += 1
             r = {
-                'message': 'Test %d passed!' % self.__someiter,
+                'message': 'Test passed!',
+                'continue': False
+            }
+            return r
+        if msg['body'] == self.SupCommands[1][0]:
+            r = {
+                'message': 'Test started...',
                 'continue': True,
-                'args': self.__someiter
+                'args': 0
+            }
+            return r
+        if msg['body'] == self.SupCommands[2][0]:
+            r = {
+                'message': 'Test was not been started...',
+                'continue': False
             }
             return r
 
     def dialog(self, args, msg):
         if msg['body'] == self.SupCommands[0][0]:
-            self.__someiter += 1
+            args += 1
             r = {
-                'message': 'Test %d passed (args: %d)!' % (self.__someiter, args),
+                'message': 'Test %d passed!' % args,
                 'continue': True,
-                'args': self.__someiter
+                'args': args
             }
             return r
         if msg['body'] == self.SupCommands[1][0]:
             r = {
-                'message': 'Test passed %d times. Thanks' % self.__someiter,
+                'message': 'Test already started...',
+                'continue': True,
+                'args': args
+            }
+            return r
+        if msg['body'] == self.SupCommands[2][0]:
+            r = {
+                'message': 'Test passed %d times. Thanks' % args,
                 'continue': False
             }
             return r

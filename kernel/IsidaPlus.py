@@ -141,7 +141,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                     log.info('Making new thread ID: %d' % threadid)
                     thread.start_new_thread(self.__dialog, (msg, threadid))
                 else:
-                    log.info('Sending message to thread ID: %d from %s' % (t, msg['from'].bare))
+                    log.info('Sending message to thread ID: %d from %s' % (t, msg['from'].full))
                     self.__threads[t]['msg'] = msg
                     self.__threads[t]['event'].set()
 
@@ -193,7 +193,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
 
             # Remove thread from collector
             self.__threads.pop(threadid)
-            log.info('Thread ID: %s has finished')
+            log.info('Thread ID: %d has finished' % threadid)
 
         else:
             reply_msg = u'%s, I heard that.' % msg['mucnick']
