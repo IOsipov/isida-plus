@@ -2,7 +2,7 @@
 
 # ======================================
 # Providing sql commands for the plugins
-from bot_kernel import IsidaSQL as __Isql
+from kernel import IsidaSQL as __Isql
 
 
 def db_fetch_one(query=None):
@@ -25,31 +25,52 @@ def db_execute(query=None):
 
 # ==========================
 # Providing sending messages
-from bot_kernel.msg_sender import sending as send_msg
+# from kernel.msg_sender import sending as send_msg
 
 
 # ===============
 # Plugin template
-class Main(object):
-    _instance = None
+class Main():
+    __someiter = 0
+
     Name = 'Template'
     Description = 'Template plugin. Used as example.'
     Ver = '0.1'
+    URL = 'Native'
     SupCommands = [
-        ['test', 'Check bot activity', 'test_func']
+        ['test', 'Check bot activity'],
+        ['test stop', 'Stop checking']
     ]
 
-    def __new__(cls):
-        if not cls._instance:
-            cls._instance = super(Main, cls).__new__(cls)
-        return cls._instance
-
-    def self_test(self, msg_from=None, msg_body=None):
-        if msg_from:
-            send_msg(msg_from, "Plugin \"%s (v%s)\": self-test passed." % (self.Name, self.Ver))
+    def self_test(self, msg=None):
+        if msg:
+            return "Plugin \"%s (v%s)\": self-test passed." % (self.Name, self.Ver)
         else:
             print("Plugin \"%s (v%s)\": self-test passed." % (self.Name, self.Ver))
-        return True
+            return True
 
-    def test_func(self, msg_from=None, msg_body=None):
-        send_msg(msg_from, 'Test passed!')
+    def run(self, msg):
+        if msg['body'] == self.SupCommands[0][0]:
+            self.__someiter += 1
+            r = {
+                'message': 'Test %d passed!' % self.__someiter,
+                'continue': True,
+                'args': self.__someiter
+            }
+            return r
+
+    def dialog(self, args, msg):
+        if msg['body'] == self.SupCommands[0][0]:
+            self.__someiter += 1
+            r = {
+                'message': 'Test %d passed (args: %d)!' % (self.__someiter, args),
+                'continue': True,
+                'args': self.__someiter
+            }
+            return r
+        if msg['body'] == self.SupCommands[1][0]:
+            r = {
+                'message': 'Test passed %d times. Thanks' % self.__someiter,
+                'continue': False
+            }
+            return r
