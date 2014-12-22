@@ -118,6 +118,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
 
     def __message(self, msg):
         if msg['type'] in ['normal', 'chat']:
+            print('INCOMING: %s' % msg)
             self.__message_processing(msg)
 
     """
@@ -127,6 +128,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     def __muc_message(self, msg):
         if msg['mucnick'] != self.nick:
             if msg['body'][0] == self.__config[u'INIT_CONFIGS'][u'ACTION_CHAR']:
+                print('MUC INCOMING: %s' % msg)
                 # Remove action char
                 msg['body'] = msg['body'][1:]
                 self.__message_processing(msg)
@@ -137,7 +139,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
 
     def __message_processing(self, msg):
         # Check already processed dialog
-        t = self.__find_interlocutor(msg['from'])
+        t = self.__find_interlocutor(msg['from'], msg['type'])
         if not t:
             # If new - find first unused id for new thread
             threadid = 1
@@ -156,10 +158,13 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     Return: thread id, otherwise None
     """
 
-    def __find_interlocutor(self, jid):
+    def __find_interlocutor(self, msg_from, msg_type):
+        print('searching for %s and %s' % (msg_from, msg_type))
         for t in self.__threads.iteritems():
-            if t[1]['msg']['from'] == jid:
-                return t[0]
+            print(' in %s' % t[1]['msg'])
+            if t[1]['msg']['type'] == msg_type:
+                if t[1]['msg']['from'] == msg_from:
+                    return t[0]
         return None
 
     """
@@ -167,8 +172,10 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     """
 
     def __dialog(self, msg, threadid):
+        print('DIALOG INCOMING: %s' % msg)
 
-        if msg['body'] in ['test', 'test stop']:
+        # TODO: find plugin which supports command in message
+        if msg['body'] in ['test', 'test start', 'test stop']:
             # Make an record about new thread
             self.__threads[threadid] = {
                 'plugin': 'template',
@@ -190,7 +197,10 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                                   mbody='%s, %s' % (msg['mucnick'], reply_object['message']),
                                   mtype='groupchat')
             else:
+                # Avoiding issues with update msg object
+                jfrom = msg['from']
                 msg.reply(reply_object['message']).send()
+                msg['from'] = jfrom
 
             # If plugin asked for next message
             while reply_object['continue']:
@@ -200,9 +210,16 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                 self.__threads[threadid]['event'].wait()
 
                 reply_object = p.dialog(reply_object['args'], self.__threads[threadid]['msg'])
-                self.send_message(mto=msg['from'].bare,
-                                  mbody='%s, %s' % (msg['mucnick'], reply_object['message']),
-                                  mtype='groupchat')
+                # Is this a chatroom message?
+                if msg['mucnick']:
+                    self.send_message(mto=msg['from'].bare,
+                                      mbody='%s, %s' % (msg['mucnick'], reply_object['message']),
+                                      mtype='groupchat')
+                else:
+                    # Avoiding issues with update msg object
+                    jfrom = msg['from']
+                    msg.reply(reply_object['message']).send()
+                    msg['from'] = jfrom
 
             # Remove thread from collector
             self.__threads.pop(threadid)
@@ -215,7 +232,10 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                                   mbody='%s, I heard that.' % msg['mucnick'],
                                   mtype='groupchat')
             else:
+                # Avoiding issues with update msg object
+                jfrom = msg['from']
                 msg.reply('I heard that.').send()
+                msg['from'] = jfrom
 
     """
     On muc presence
