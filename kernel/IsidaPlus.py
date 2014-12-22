@@ -118,7 +118,6 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
 
     def __message(self, msg):
         if msg['type'] in ['normal', 'chat']:
-            print('INCOMING: %s' % msg)
             self.__message_processing(msg)
 
     """
@@ -128,7 +127,6 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     def __muc_message(self, msg):
         if msg['mucnick'] != self.nick:
             if msg['body'][0] == self.__config[u'INIT_CONFIGS'][u'ACTION_CHAR']:
-                print('MUC INCOMING: %s' % msg)
                 # Remove action char
                 msg['body'] = msg['body'][1:]
                 self.__message_processing(msg)
@@ -159,9 +157,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     """
 
     def __find_interlocutor(self, msg_from, msg_type):
-        print('searching for %s and %s' % (msg_from, msg_type))
         for t in self.__threads.iteritems():
-            print(' in %s' % t[1]['msg'])
             if t[1]['msg']['type'] == msg_type:
                 if t[1]['msg']['from'] == msg_from:
                     return t[0]
@@ -172,8 +168,6 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     """
 
     def __dialog(self, msg, threadid):
-        print('DIALOG INCOMING: %s' % msg)
-
         # TODO: find plugin which supports command in message
         if msg['body'] in ['test', 'test start', 'test stop']:
             # Make an record about new thread
@@ -240,6 +234,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     """
     On muc presence
     """
+
     def __muc_online(self, presence):
         if presence['muc']['nick'] != self.nick:
             # self.send_message(mto=presence['from'].bare,
