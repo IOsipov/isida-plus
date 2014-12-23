@@ -100,7 +100,7 @@ class IsidaSQLThread():
                     u'DBUSER': 'isidaplus',
                     u'DBPASS': 'isidaplus',
                     u'ERRDELAY': 10,
-                    u'ERRRETRY': 5
+                    u'ERRRETRY': 3
                 }}
     __config_parser = ConfigParser.RawConfigParser()
 

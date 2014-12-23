@@ -20,7 +20,7 @@ DBUSER      = isidaplus
 DBPASS      = isidaplus
 THREADS     = 3
 ERRDELAY    = 10
-ERRRETRY    = 5
+ERRRETRY    = 3
 
 [LOGS]
 DEBUG_LVL   = 20
