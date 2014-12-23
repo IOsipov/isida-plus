@@ -2,6 +2,7 @@
 
 import ConfigParser
 import logging as log
+import threading
 from time import sleep as __sleep__
 
 
@@ -17,15 +18,19 @@ class IsidaSQL(object):
         cfg = ConfigParser.RawConfigParser()
         cfg.read(config_file)
         try:
-            self.__threads_count = cfg.getint('DB', 'THREADS1')
+            self.__threads_count = cfg.getint('DB', 'THREADS')
         except (ConfigParser.NoOptionError, ConfigParser.NoSectionError):
             pass
         except IOError, e:
             print(u'IOError exception at __config_get__(\'DB\', \'THREADS\'): %s' % e)
             del self
 
+        threads = []
         # Starting SQL connectors
-        IsidaSQLDriver(config_file).run()
+        for th in range(0, self.__threads_count):
+            threads.append(threading.Thread(target=IsidaSQLThread(config_file).run))
+            __sleep__(0.5)
+            threads[th].start()
 
     # Singleton
     def __new__(cls, *args, **kwargs):
@@ -34,8 +39,13 @@ class IsidaSQL(object):
         return cls.__instance
 
 
+# =================================
+# Use this class only if you need
+# a separate connection to iSida DB
+# =================================
+
 # noinspection PyPep8Naming
-class IsidaSQLDriver():
+class IsidaSQLThread():
     # Error counter for DB connection
     __err_count_db = 0
 
@@ -123,6 +133,7 @@ class IsidaSQLDriver():
     def __db_connect(self):
         if self.__config[u'DB'][u'TYPE'] == 'mysql':
             import mysql.connector as mysqldb
+
             try:
                 self.__connector = mysqldb.connect(
                     database=self.__config[u'DB'][u'DBNAME'],
@@ -157,6 +168,7 @@ class IsidaSQLDriver():
         if self.__config[u'DB'][u'TYPE'] == 'mysql':
             from mysql.connector import Error as MySQLError
             from mysql.connector import ProgrammingError as MySQLProgrammingError
+
             try:
                 cursor = self.__connector.cursor()
                 cursor.execute(query)
@@ -187,6 +199,7 @@ class IsidaSQLDriver():
         if self.__config[u'DB'][u'TYPE'] == 'mysql':
             from mysql.connector import Error as MySQLError
             from mysql.connector import ProgrammingError as MySQLProgrammingError
+
             try:
                 cursor = self.__connector.cursor()
                 cursor.execute(query)
