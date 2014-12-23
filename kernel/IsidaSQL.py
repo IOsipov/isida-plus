@@ -105,9 +105,12 @@ class IsidaSQLThread():
     __config_parser = ConfigParser.RawConfigParser()
 
     def run(self):
+        delay = 60
+        if self.__config['DB']['ERRDELAY'] >= 10:
+            delay = self.__config['DB']['ERRDELAY']
         # Infinite loop
         while 1:
-            __sleep__(self.__config['DB']['ERRDELAY'])
+            __sleep__(delay)
 
     # ==========================
     # Get value from config file
