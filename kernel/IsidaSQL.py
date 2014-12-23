@@ -43,7 +43,7 @@ class IsidaSQL(object):
     # ============================
     # Fetch one row from SQL query
     def fetch_one(self, query):
-        if self.__threads_iterator < self.__threads_count:
+        if self.__threads_iterator + 1 < self.__threads_count:
             self.__threads_iterator += 1
         else:
             self.__threads_iterator = 0
@@ -52,7 +52,7 @@ class IsidaSQL(object):
     # =============================
     # Fetch all rows from SQL query
     def fetch_all(self, query):
-        if self.__threads_iterator < self.__threads_count:
+        if self.__threads_iterator + 1 < self.__threads_count:
             self.__threads_iterator += 1
         else:
             self.__threads_iterator = 0
@@ -61,7 +61,7 @@ class IsidaSQL(object):
     # ================
     # Execute an query
     def execute(self, query):
-        if self.__threads_iterator < self.__threads_count:
+        if self.__threads_iterator + 1 < self.__threads_count:
             self.__threads_iterator += 1
         else:
             self.__threads_iterator = 0
@@ -150,6 +150,7 @@ class IsidaSQLThread():
 
         # Connect to the DB
         self.__err_count_db = 0
+        self.__err_count_sql = 0
         self.__define_db_params()
         self.__db_connect()
 
@@ -203,6 +204,8 @@ class IsidaSQLThread():
     # If success - returns number of affected rows
     def execute(self, query):
         log.debug(u'[thread %s] processing execute(\"%s\")' % (self.__number, query))
+        log.debug(u'[thread %s] __err_count_db = %d, __err_count_sql = %d' %
+                  (self.__number, self.__err_count_db, self.__err_count_sql))
         if self.__config[u'DB'][u'TYPE'] == 'mysql':
             from mysql.connector import Error as MySQLError
             from mysql.connector import ProgrammingError as MySQLProgrammingError
@@ -218,14 +221,16 @@ class IsidaSQLThread():
                 self.__err_count_sql += 1
                 log.error(u'[thread %s] MySQL programming exception at execute("%s"): %s' % (self.__number, query, e))
                 return False
-            except MySQLError:
+            except MySQLError, e:
                 self.__err_count_sql += 1
+                log.error(u'[thread %s] MySQL exception at execute("%s"): %s' % (self.__number, query, e))
+                self.__connector.disconnect()
+                self.__db_connect()
                 if self.__err_count_db < self.__config[u'DB'][u'ERRRETRY']:
                     if self.__err_count_sql < self.__config[u'DB'][u'ERRRETRY']:
-                        self.__connector.disconnect()
-                        self.__db_connect()
                         return self.execute(query)
                     else:
+                        self.__err_count_sql = 0
                         return False
                 else:
                     return False
@@ -242,6 +247,8 @@ class IsidaSQLThread():
     # Read data with SQL query
     def fetch_data(self, query, return_all):
         log.debug(u'[thread %s] processing fetch_data(\"%s\")' % (self.__number, query))
+        log.debug(u'[thread %s] __err_count_db = %d, __err_count_sql = %d' %
+                  (self.__number, self.__err_count_db, self.__err_count_sql))
         if self.__config[u'DB'][u'TYPE'] == 'mysql':
             from mysql.connector import Error as MySQLError
             from mysql.connector import ProgrammingError as MySQLProgrammingError
@@ -259,14 +266,16 @@ class IsidaSQLThread():
                 self.__err_count_sql += 1
                 log.error(u'[thread %s] MySQL programming exception at execute("%s"): %s' % (self.__number, query, e))
                 return False
-            except MySQLError:
+            except MySQLError, e:
                 self.__err_count_sql += 1
+                log.error(u'[thread %s] MySQL exception at execute("%s"): %s' % (self.__number, query, e))
+                self.__connector.disconnect()
+                self.__db_connect()
                 if self.__err_count_db < self.__config[u'DB'][u'ERRRETRY']:
                     if self.__err_count_sql < self.__config[u'DB'][u'ERRRETRY']:
-                        self.__connector.disconnect()
-                        self.__db_connect()
                         return self.fetch_data(query, return_all)
                     else:
+                        self.__err_count_sql = 0
                         return False
                 else:
                     return False
