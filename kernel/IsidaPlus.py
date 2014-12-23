@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 
-import logging as log
+import logging
 import ConfigParser
 import thread
 from threading import Event
 from time import time
 
 import sleekxmpp
+from kernel.IsidaSQL import IsidaSQL
+
+log = logging.getLogger('KernelLogger')
 
 
 # noinspection PyMethodMayBeStatic
@@ -19,7 +22,8 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                 u'LOGS': {
                     u'DEBUG_LVL': 1,
                     u'LOG_DIR': 'logs',
-                    u'PREFIX_MAIN': 'kernel'
+                    u'PREFIX_MAIN': 'kernel',
+                    u'PREFIX_FULL': 'full'
                 },
                 u'XMPP': {
                     u'NICKNAME': 'iSida-plus',
@@ -36,8 +40,12 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                 }}
     __config_parser = ConfigParser.RawConfigParser()
 
+    # Kernel supported commands
+    __kcmds = ['db']
+
     # Collector for exchanging messages between kernel and threads
     __threads = {}
+    __db = None
 
     """
     Bot initialization
@@ -53,12 +61,22 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
         self.__config[u'LOGS'][u'DEBUG_LVL'] = self.__config_get(u'LOGS', u'DEBUG_LVL')
         self.__config[u'LOGS'][u'LOG_DIR'] = self.__config_get(u'LOGS', u'LOG_DIR')
         self.__config[u'LOGS'][u'PREFIX_MAIN'] = self.__config_get(u'LOGS', u'PREFIX_MAIN')
+        self.__config[u'LOGS'][u'PREFIX_FULL'] = self.__config_get(u'LOGS', u'PREFIX_FULL')
 
-        # Define logging parameters
-        log.basicConfig(format=u'[%(asctime)s %(levelname)s] %(message)s',
-                        level=self.__config[u'LOGS'][u'DEBUG_LVL'],
-                        filename=u'%s/%s.log' %
+        # Define logging parameters for the full logs
+        logging.basicConfig(format=u'[%(asctime)s %(levelname)s] %(message)s',
+                            level=logging.INFO,
+                            filename=u'%s/%s.log' %
+                                     (self.__config[u'LOGS'][u'LOG_DIR'], self.__config[u'LOGS'][u'PREFIX_FULL']))
+
+        # Define logging parameters for kernel
+        log.setLevel(self.__config[u'LOGS'][u'DEBUG_LVL'])
+        fh = logging.FileHandler(u'%s/%s.log' %
                                  (self.__config[u'LOGS'][u'LOG_DIR'], self.__config[u'LOGS'][u'PREFIX_MAIN']))
+        fh.setLevel(self.__config[u'LOGS'][u'DEBUG_LVL'])
+        formatter = logging.Formatter(u'[%(asctime)s %(levelname)s] %(message)s')
+        fh.setFormatter(formatter)
+        log.addHandler(fh)
 
         # Define all parameters
         self.__define_params()
@@ -70,11 +88,21 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
         self.nick = self.__config[u'XMPP'][u'NICKNAME']
         self.room = self.__config[u'INIT_CONFIGS'][u'CHATROOM']
 
+        # Initialize DB connections
+        self.__db = IsidaSQL()
+
         # Make handlers
         self.add_event_handler('session_start', self.__start)
         self.add_event_handler('muc::%s::got_online' % self.room, self.__muc_online)
         self.add_event_handler('message', self.__message)
         self.add_event_handler("groupchat_message", self.__muc_message)
+
+    """
+    Destructor
+    """
+
+    def on_shutdown(self):
+        self.__db.stop()
 
     """
     Get value from config file
@@ -93,7 +121,6 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                 log.error(u'ConfigParser exception at __config_get__(%s, %s): %s' % (section, option, e))
         except IOError, e:
             log.error(u'IOError exception at __config_get__(%s, %s): %s' % (section, option, e))
-            self.__del__()
             exit(-1)
 
     """
@@ -113,6 +140,8 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     def __start(self, event):
         self.send_presence()
         self.get_roster()
+
+        # TODO: get conferences from the DB
         self.plugin['xep_0045'].joinMUC(self.room, self.nick, wait=True)
 
     """
@@ -121,6 +150,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
 
     def __message(self, msg):
         if msg['type'] in ['normal', 'chat']:
+            log.debug(u'[RECV] <-- %s' % (msg['body']))
             self.__message_processing(msg)
 
     """
@@ -129,6 +159,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
 
     def __muc_message(self, msg):
         if msg['mucnick'] != self.nick:
+            log.debug(u'[RECV] <== %s' % (msg['body']))
             if msg['body'][0] == self.__config[u'INIT_CONFIGS'][u'ACTION_CHAR']:
                 # Remove action char
                 msg['body'] = msg['body'][1:]
@@ -147,10 +178,10 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
             while threadid in self.__threads:
                 threadid += 1
 
-            log.info('Making new thread ID: %d' % threadid)
+            log.debug('Making new thread ID: %d' % threadid)
             thread.start_new_thread(self.__dialog, (msg, threadid))
         else:
-            log.info('Sending message to thread ID: %d from %s' % (t, msg['from'].full))
+            log.debug('Sending message to thread ID: %d from %s' % (t, msg['from'].full))
             self.__threads[t]['msg'] = msg
             self.__threads[t]['event'].set()
 
@@ -162,8 +193,9 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     def __find_interlocutor(self, msg_from, msg_type):
         for t in self.__threads.iteritems():
             # Threads created per user and per each window
-            # So, if the same user will write from chat room
-            #  and from private messages - threads will be separated
+            # So, if the same user will write from the
+            #  chat room and from private messages
+            #  - that's will be different threads
             if t[1]['msg']['type'] == msg_type:
                 if t[1]['msg']['from'] == msg_from:
                     return t[0]
@@ -174,16 +206,22 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
     """
 
     def __dialog(self, msg, threadid):
-        # TODO: find plugin which supports command in message
-        if msg['body'] in ['test', 'test start', 'test stop']:
-            # Make an record about new thread
-            self.__threads[threadid] = {
-                'plugin': 'template',
-                'starttime': int(time()),
-                'msg': msg,
-                'event': Event()
-            }
+        # Make an record about new thread
+        self.__threads[threadid] = {
+            'starttime': int(time()),
+            'msg': msg,
+            'event': Event()
+        }
 
+        # At first, try to find is that an kernel command
+        for cmd in self.__kcmds:
+            if msg['body'][:len(cmd)] == cmd:
+                self.__kernel_commands(msg, threadid)
+                return
+
+        # TODO: find plugin which supports command in message
+
+        if msg['body'] in ['test', 'test start', 'test stop']:
             # Create plugin class
             from plugins.template.template import Main as Ptemplate
             p = Ptemplate()
@@ -197,20 +235,20 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                 # Waiting until __muc_message() will set flag again
                 # (When user have put next message)
                 self.__threads[threadid]['event'].clear()
-                log.info('Thread ID: %d is waiting now...' % threadid)
+                log.debug('Thread ID: %d is waiting now...' % threadid)
                 self.__threads[threadid]['event'].wait()
 
                 # Sending new user message to an plugin and reply
                 reply_object = p.dialog(reply_object['args'], self.__threads[threadid]['msg'])
                 self.__send_message(msg, reply_object)
 
-            # Remove thread from collector
-            self.__threads.pop(threadid)
-            log.info('Thread ID: %d has finished' % threadid)
-
         else:
             # Make echo
             self.__send_message(msg)
+
+        # Remove thread from collector
+        self.__threads.pop(threadid)
+        log.debug('Thread ID: %d has finished' % threadid)
 
     """
     Message sending
@@ -222,10 +260,12 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
 
         # Is this a chatroom message?
         if msg['mucnick']:
+            log.debug(u'[SEND] %s ==> %s' % (msg['from'].full, reply_object['message']))
             self.send_message(mto=msg['from'].bare,
                               mbody='%s, %s' % (msg['mucnick'], reply_object['message']),
                               mtype='groupchat')
         else:
+            log.debug(u'[SEND] %s --> %s' % (msg['from'].full, reply_object['message']))
             # Avoiding issues with update msg object
             jfrom = msg['from']
             msg.reply(reply_object['message']).send()
@@ -243,3 +283,29 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
             #                   mtype='groupchat')
             pass
 
+    """
+    Kernel commands processing
+    """
+
+    def __kernel_commands(self, msg, threadid):
+        if msg['body'] == 'db stop':
+            self.__send_message(msg, {'message': 'Stopping DB connections...'})
+            if self.__db.stop():
+                self.__send_message(msg, {'message': 'Done'})
+            else:
+                self.__send_message(msg, {'message': 'Failed. Please check DB logs.'})
+        elif msg['body'] == 'db start':
+            self.__send_message(msg, {'message': 'Starting DB connections...'})
+            if self.__db.start():
+                self.__send_message(msg, {'message': 'Done'})
+            else:
+                self.__send_message(msg, {'message': 'Failed. Please check DB logs.'})
+        elif msg['body'] == 'db restart':
+            self.__send_message(msg, {'message': 'Restarting DB connections...'})
+            if self.__db.restart():
+                self.__send_message(msg, {'message': 'Done'})
+            else:
+                self.__send_message(msg, {'message': 'Failed. Please check DB logs.'})
+        else:
+            self.__send_message(msg, {'message': 'Please check ".help" command to find usage examples.'})
+        self.__threads.pop(threadid)

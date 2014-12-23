@@ -26,4 +26,5 @@ ERRRETRY    = 3
 DEBUG_LVL   = 20
 LOG_DIR     = logs
 PREFIX_MAIN = kernel
+PREFIX_FULL = full
 PREFIX_DB   = db

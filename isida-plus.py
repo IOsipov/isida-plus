@@ -29,7 +29,9 @@ if isidabot.connect():
     # Start bot
     isidabot.process(block=True)
 
-    # TODO: shutdown actions
-    print(u'Good bye')
+    # Close DB connections
+    print(u'Closing DB connections...')
+    isidabot.on_shutdown()
+
 else:
     print(u'Unable to connect')

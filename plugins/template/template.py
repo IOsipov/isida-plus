@@ -55,16 +55,22 @@ class Main():
                 'continue': False
             }
             return r
-        if msg['body'] == self.SupCommands[1][0]:
+        elif msg['body'] == self.SupCommands[1][0]:
             r = {
                 'message': 'Test started...',
                 'continue': True,
                 'args': 0
             }
             return r
-        if msg['body'] == self.SupCommands[2][0]:
+        elif msg['body'] == self.SupCommands[2][0]:
             r = {
                 'message': 'Test was not been started...',
+                'continue': False
+            }
+            return r
+        else:
+            r = {
+                'message': 'Please check ".help template" for usage examples...',
                 'continue': False
             }
             return r
@@ -78,16 +84,23 @@ class Main():
                 'args': args
             }
             return r
-        if msg['body'] == self.SupCommands[1][0]:
+        elif msg['body'] == self.SupCommands[1][0]:
             r = {
                 'message': 'Test already started...',
                 'continue': True,
                 'args': args
             }
             return r
-        if msg['body'] == self.SupCommands[2][0]:
+        elif msg['body'] == self.SupCommands[2][0]:
             r = {
                 'message': 'Test passed %d times. Thanks' % args,
                 'continue': False
+            }
+            return r
+        else:
+            r = {
+                'message': 'Please check ".help template" for usage examples...',
+                'continue': True,
+                'args': args
             }
             return r
