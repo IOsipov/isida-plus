@@ -12,7 +12,9 @@ from time import sleep as __sleep__
 
 class IsidaSQL(object):
     __instance = None
+    __threads = []
     __threads_count = 1
+    __threads_iterator = -1
 
     def __init__(self, config_file='isida-plus.cfg'):
         cfg = ConfigParser.RawConfigParser()
@@ -25,18 +27,45 @@ class IsidaSQL(object):
             print(u'IOError exception at __config_get__(\'DB\', \'THREADS\'): %s' % e)
             del self
 
-        threads = []
         # Starting SQL connectors
         for th in range(0, self.__threads_count):
-            threads.append(threading.Thread(target=IsidaSQLThread(config_file).run))
+            self.__threads.append({'object': IsidaSQLThread(config_file, th)})
+            self.__threads[th]['thread'] = threading.Thread(target=self.__threads[th]['object'].run)
+            self.__threads[th]['thread'].start()
             __sleep__(0.5)
-            threads[th].start()
 
     # Singleton
     def __new__(cls, *args, **kwargs):
         if not cls.__instance:
             cls.__instance = super(IsidaSQL, cls).__new__(cls)
         return cls.__instance
+
+    # ============================
+    # Fetch one row from SQL query
+    def fetch_one(self, query):
+        if self.__threads_iterator < self.__threads_count:
+            self.__threads_iterator += 1
+        else:
+            self.__threads_iterator = 0
+        return self.__threads[self.__threads_iterator]['object'].fetch_data(query, False)
+
+    # =============================
+    # Fetch all rows from SQL query
+    def fetch_all(self, query):
+        if self.__threads_iterator < self.__threads_count:
+            self.__threads_iterator += 1
+        else:
+            self.__threads_iterator = 0
+        return self.__threads[self.__threads_iterator]['object'].fetch_data(query, True)
+
+    # ================
+    # Execute an query
+    def execute(self, query):
+        if self.__threads_iterator < self.__threads_count:
+            self.__threads_iterator += 1
+        else:
+            self.__threads_iterator = 0
+        return self.__threads[self.__threads_iterator]['object'].execute(query)
 
 
 # =================================
@@ -46,8 +75,12 @@ class IsidaSQL(object):
 
 # noinspection PyPep8Naming
 class IsidaSQLThread():
+    # Thread number
+    __number = None
+
     # Error counter for DB connection
     __err_count_db = 0
+    __err_count_sql = 0
 
     # SQL connection
     __connector = None
@@ -72,15 +105,9 @@ class IsidaSQLThread():
     __config_parser = ConfigParser.RawConfigParser()
 
     def run(self):
-        # If the connection to the DB is exists
-        if self.__connector:
-            while 1:
-                a = self.fetch_one('SHOW TABLES')
-                if a:
-                    print(a)
-                    __sleep__(5)
-                if not a:
-                    break
+        # Infinite loop
+        while 1:
+            __sleep__(self.__config['DB']['ERRDELAY'])
 
     # ==========================
     # Get value from config file
@@ -101,7 +128,11 @@ class IsidaSQLThread():
 
     # ==================
     # Init SQL connector
-    def __init__(self, config_file):
+    def __init__(self, config_file, thread_num=None):
+        # Set thread number
+        if thread_num is not None:
+            self.__number = thread_num
+
         # Open config file
         self.__config[u'CONFIGFILE'] = config_file
         self.__config_parser.read(self.__config[u'CONFIGFILE'])
@@ -121,6 +152,8 @@ class IsidaSQLThread():
         self.__err_count_db = 0
         self.__define_db_params()
         self.__db_connect()
+
+        log.debug(u'SQL connector #%s started' % self.__number)
 
     # ==========================
     # Define database parameters
@@ -145,13 +178,16 @@ class IsidaSQLThread():
                 self.__err_count_db = 0
             except mysqldb.Error, e:
                 self.__err_count_db += 1
-                log.error(u'MySQL exception #%d at __db_connect(): %s' % (self.__err_count_db, e))
+                log.error(u'[thread %s] MySQL exception #%d at __db_connect(): %s' %
+                          (self.__number, self.__err_count_db, e))
                 if self.__err_count_db < self.__config[u'DB'][u'ERRRETRY']:
-                    log.error(u'Next try in %d seconds...' % self.__config[u'DB'][u'ERRDELAY'])
+                    log.error(u'[thread %s] Next try in %d seconds...' %
+                              (self.__number, self.__config[u'DB'][u'ERRDELAY']))
                     __sleep__(self.__config[u'DB'][u'ERRDELAY'])
                     self.__db_connect()
                 else:
-                    log.error(u'Reached limit for exceptions at __db_connect(). Execution stops.')
+                    log.error(u'[thread %s] Reached limit for exceptions at __db_connect(). Execution stops.' %
+                              self.__number)
                     return False
 
         elif self.__config[u'DB'][u'TYPE'] == 'sqlite3':
@@ -162,26 +198,35 @@ class IsidaSQLThread():
             log.error(u'Error: __db_connect() to the PostgreSQL database not supported yet...')
             exit(0)
 
-    # =========================
+    # ============================================
     # Write data with SQL query
+    # If success - returns number of affected rows
     def execute(self, query):
+        log.debug(u'[thread %s] processing execute(\"%s\")' % (self.__number, query))
         if self.__config[u'DB'][u'TYPE'] == 'mysql':
             from mysql.connector import Error as MySQLError
             from mysql.connector import ProgrammingError as MySQLProgrammingError
 
             try:
                 cursor = self.__connector.cursor()
-                cursor.execute(query)
+                affected_rows = cursor.execute(query)
                 self.__connector.commit()
                 self.__err_count_db = 0
-                return True
+                self.__err_count_sql = 0
+                return affected_rows
             except MySQLProgrammingError, e:
-                log.error(u'MySQL programming exception at execute("%s"): %s' % (query, e))
+                self.__err_count_sql += 1
+                log.error(u'[thread %s] MySQL programming exception at execute("%s"): %s' % (self.__number, query, e))
                 return False
             except MySQLError:
+                self.__err_count_sql += 1
                 if self.__err_count_db < self.__config[u'DB'][u'ERRRETRY']:
-                    self.__db_connect()
-                    return self.execute(query)
+                    if self.__err_count_sql < self.__config[u'DB'][u'ERRRETRY']:
+                        self.__connector.disconnect()
+                        self.__db_connect()
+                        return self.execute(query)
+                    else:
+                        return False
                 else:
                     return False
 
@@ -195,7 +240,8 @@ class IsidaSQLThread():
 
     # ========================
     # Read data with SQL query
-    def __fetch_data(self, query, return_all):
+    def fetch_data(self, query, return_all):
+        log.debug(u'[thread %s] processing fetch_data(\"%s\")' % (self.__number, query))
         if self.__config[u'DB'][u'TYPE'] == 'mysql':
             from mysql.connector import Error as MySQLError
             from mysql.connector import ProgrammingError as MySQLProgrammingError
@@ -204,17 +250,24 @@ class IsidaSQLThread():
                 cursor = self.__connector.cursor()
                 cursor.execute(query)
                 self.__err_count_db = 0
+                self.__err_count_sql = 0
                 if return_all:
                     return cursor.fetchall()
                 else:
                     return cursor.fetchone()
             except MySQLProgrammingError, e:
-                log.error(u'MySQL programming exception at execute("%s"): %s' % (query, e))
+                self.__err_count_sql += 1
+                log.error(u'[thread %s] MySQL programming exception at execute("%s"): %s' % (self.__number, query, e))
                 return False
             except MySQLError:
+                self.__err_count_sql += 1
                 if self.__err_count_db < self.__config[u'DB'][u'ERRRETRY']:
-                    self.__db_connect()
-                    return self.__fetch_data(query, return_all)
+                    if self.__err_count_sql < self.__config[u'DB'][u'ERRRETRY']:
+                        self.__connector.disconnect()
+                        self.__db_connect()
+                        return self.fetch_data(query, return_all)
+                    else:
+                        return False
                 else:
                     return False
 
@@ -225,13 +278,3 @@ class IsidaSQLThread():
         elif self.__config[u'DB'][u'TYPE'] == 'pgsql':
             log.error(u'Error: execute() to the PostgreSQL database not supported yet...')
             exit(0)
-
-    # ============================
-    # Fetch one row from SQL query
-    def fetch_one(self, query):
-        return self.__fetch_data(query, False)
-
-    # =============================
-    # Fetch all rows from SQL query
-    def fetch_all(self, query):
-        return self.__fetch_data(query, True)
