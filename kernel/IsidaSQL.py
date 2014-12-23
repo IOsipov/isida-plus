@@ -207,8 +207,6 @@ class IsidaSQLThread():
     # If success - returns number of affected rows
     def execute(self, query):
         log.debug(u'[thread %s] processing execute(\"%s\")' % (self.__number, query))
-        log.debug(u'[thread %s] __err_count_db = %d, __err_count_sql = %d' %
-                  (self.__number, self.__err_count_db, self.__err_count_sql))
         if self.__config[u'DB'][u'TYPE'] == 'mysql':
             from mysql.connector import Error as MySQLError
             from mysql.connector import ProgrammingError as MySQLProgrammingError
@@ -250,8 +248,6 @@ class IsidaSQLThread():
     # Read data with SQL query
     def fetch_data(self, query, return_all):
         log.debug(u'[thread %s] processing fetch_data(\"%s\")' % (self.__number, query))
-        log.debug(u'[thread %s] __err_count_db = %d, __err_count_sql = %d' %
-                  (self.__number, self.__err_count_db, self.__err_count_sql))
         if self.__config[u'DB'][u'TYPE'] == 'mysql':
             from mysql.connector import Error as MySQLError
             from mysql.connector import ProgrammingError as MySQLProgrammingError
