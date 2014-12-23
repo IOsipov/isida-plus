@@ -18,8 +18,9 @@ PORT        = 3306
 DBNAME      = isidaplus
 DBUSER      = isidaplus
 DBPASS      = isidaplus
+THREADS     = 3
 ERRDELAY    = 10
-ERRRETRY    = 3
+ERRRETRY    = 5
 
 [LOGS]
 DEBUG_LVL   = 20

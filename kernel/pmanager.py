@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 
-import plugins.template as tpl
 import os
+
+import plugins.template.template as tpl
 from settings.config import plugin_dir
+
 
 
 # =======================================

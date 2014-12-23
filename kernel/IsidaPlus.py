@@ -2,10 +2,11 @@
 
 import logging as log
 import ConfigParser
-import sleekxmpp
 import thread
 from threading import Event
 from time import time
+
+import sleekxmpp
 
 
 # noinspection PyMethodMayBeStatic
@@ -34,6 +35,8 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                     u'ACTION_CHAR': '.'
                 }}
     __config_parser = ConfigParser.RawConfigParser()
+
+    # Collector for exchanging messages between kernel and threads
     __threads = {}
 
     """
@@ -51,7 +54,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
         self.__config[u'LOGS'][u'LOG_DIR'] = self.__config_get(u'LOGS', u'LOG_DIR')
         self.__config[u'LOGS'][u'PREFIX_MAIN'] = self.__config_get(u'LOGS', u'PREFIX_MAIN')
 
-        # Logging level for sleekxmpp lib
+        # Define logging parameters
         log.basicConfig(format=u'[%(asctime)s %(levelname)s] %(message)s',
                         level=self.__config[u'LOGS'][u'DEBUG_LVL'],
                         filename=u'%s/%s.log' %
@@ -83,7 +86,7 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
                 return int(self.__config_parser.get(section, option))
             else:
                 return self.__config_parser.get(section, option)
-        except ConfigParser, e:
+        except (ConfigParser.NoOptionError, ConfigParser.NoSectionError), e:
             if use_default:
                 return self.__config[section][option]
             else:
@@ -158,6 +161,9 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
 
     def __find_interlocutor(self, msg_from, msg_type):
         for t in self.__threads.iteritems():
+            # Threads created per user and per each window
+            # So, if the same user will write from chat room
+            #  and from private messages - threads will be separated
             if t[1]['msg']['type'] == msg_type:
                 if t[1]['msg']['from'] == msg_from:
                     return t[0]
@@ -179,57 +185,51 @@ class IsidaPlus(sleekxmpp.ClientXMPP):
             }
 
             # Create plugin class
-            from plugins.template import Main as Ptemplate
+            from plugins.template.template import Main as Ptemplate
             p = Ptemplate()
 
-            # Get plugin answer message
+            # Get plugin answer message and reply
             reply_object = p.run(msg)
-
-            # Is this a chatroom message?
-            if msg['mucnick']:
-                self.send_message(mto=msg['from'].bare,
-                                  mbody='%s, %s' % (msg['mucnick'], reply_object['message']),
-                                  mtype='groupchat')
-            else:
-                # Avoiding issues with update msg object
-                jfrom = msg['from']
-                msg.reply(reply_object['message']).send()
-                msg['from'] = jfrom
+            self.__send_message(msg, reply_object)
 
             # If plugin asked for next message
             while reply_object['continue']:
                 # Waiting until __muc_message() will set flag again
+                # (When user have put next message)
                 self.__threads[threadid]['event'].clear()
                 log.info('Thread ID: %d is waiting now...' % threadid)
                 self.__threads[threadid]['event'].wait()
 
+                # Sending new user message to an plugin and reply
                 reply_object = p.dialog(reply_object['args'], self.__threads[threadid]['msg'])
-                # Is this a chatroom message?
-                if msg['mucnick']:
-                    self.send_message(mto=msg['from'].bare,
-                                      mbody='%s, %s' % (msg['mucnick'], reply_object['message']),
-                                      mtype='groupchat')
-                else:
-                    # Avoiding issues with update msg object
-                    jfrom = msg['from']
-                    msg.reply(reply_object['message']).send()
-                    msg['from'] = jfrom
+                self.__send_message(msg, reply_object)
 
             # Remove thread from collector
             self.__threads.pop(threadid)
             log.info('Thread ID: %d has finished' % threadid)
 
         else:
-            # Is this a chatroom message?
-            if msg['mucnick']:
-                self.send_message(mto=msg['from'].bare,
-                                  mbody='%s, I heard that.' % msg['mucnick'],
-                                  mtype='groupchat')
-            else:
-                # Avoiding issues with update msg object
-                jfrom = msg['from']
-                msg.reply('I heard that.').send()
-                msg['from'] = jfrom
+            # Make echo
+            self.__send_message(msg)
+
+    """
+    Message sending
+    """
+
+    def __send_message(self, msg, reply_object=None):
+        if not reply_object:
+            reply_object = {'message': 'I heard that'}
+
+        # Is this a chatroom message?
+        if msg['mucnick']:
+            self.send_message(mto=msg['from'].bare,
+                              mbody='%s, %s' % (msg['mucnick'], reply_object['message']),
+                              mtype='groupchat')
+        else:
+            # Avoiding issues with update msg object
+            jfrom = msg['from']
+            msg.reply(reply_object['message']).send()
+            msg['from'] = jfrom
 
     """
     On muc presence
